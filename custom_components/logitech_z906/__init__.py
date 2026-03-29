@@ -1,4 +1,4 @@
-"""Logitech Z906 integration — IR-controlled media player via Broadlink."""
+"""Logitech Z906 integration — IR-controlled speaker system via Broadlink."""
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 
-PLATFORMS = [Platform.MEDIA_PLAYER, Platform.SENSOR]
+PLATFORMS = [Platform.BUTTON, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
