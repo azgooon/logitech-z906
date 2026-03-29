@@ -7,47 +7,39 @@ from homeassistant.components.media_player import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
 )
-from homeassistant.const import CONF_NAME
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import (
-    CMD_EFFECT,
-    CMD_MUTE,
-    CMD_OFF,
-    CMD_ON,
-    CMD_VOLUME_DOWN,
-    CMD_VOLUME_UP,
     CONF_POWER_SENSOR,
-    CONF_POWER_THRESHOLD,
-    CONF_REMOTE_DEVICE,
     CONF_REMOTE_ENTITY,
-    DEFAULT_POWER_THRESHOLD,
     DOMAIN,
+    IR_CODES,
+    POWER_THRESHOLD,
     SOURCES,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
+    entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Set up the Z906 media player from discovery."""
-    conf = hass.data[DOMAIN]
+    """Set up the Z906 media player from a config entry."""
+    conf = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([LogitechZ906(hass, conf)])
 
 
 class LogitechZ906(RestoreEntity, MediaPlayerEntity):
     """Representation of a Logitech Z906 speaker system."""
 
-    _attr_has_entity_name = False
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_should_poll = False
     _attr_supported_features = (
         MediaPlayerEntityFeature.TURN_ON
@@ -60,17 +52,19 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
 
     def __init__(self, hass: HomeAssistant, config: dict) -> None:
         self._remote_entity = config[CONF_REMOTE_ENTITY]
-        self._remote_device = config[CONF_REMOTE_DEVICE]
         self._power_sensor = config.get(CONF_POWER_SENSOR)
-        self._power_threshold = config.get(
-            CONF_POWER_THRESHOLD, DEFAULT_POWER_THRESHOLD
-        )
 
-        self._attr_name = config.get(CONF_NAME, "Logitech Z906")
-        self._attr_unique_id = f"logitech_z906_{self._remote_device.lower()}"
+        self._attr_unique_id = "logitech_z906"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, "logitech_z906")},
+            "name": "Logitech Z906",
+            "manufacturer": "Logitech",
+            "model": "Z906",
+        }
         self._attr_state = MediaPlayerState.OFF
         self._attr_source = None
         self._attr_is_volume_muted = False
+        self._power_watts = None
 
     async def async_added_to_hass(self) -> None:
         """Restore state and start tracking power sensor."""
@@ -81,7 +75,6 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
                 "is_volume_muted", False
             )
 
-        # Track power sensor for real on/off state
         if self._power_sensor:
             self._update_power_state()
             async_track_state_change_event(
@@ -94,6 +87,13 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
         self._update_power_state()
         self.async_write_ha_state()
 
+    @property
+    def extra_state_attributes(self) -> dict | None:
+        """Expose power consumption when sensor is configured."""
+        if self._power_watts is not None:
+            return {"power_consumption": self._power_watts}
+        return None
+
     @callback
     def _update_power_state(self) -> None:
         """Update on/off state from power sensor reading."""
@@ -102,36 +102,51 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
             return
         try:
             power = float(state.state)
+            self._power_watts = power
             self._attr_state = (
                 MediaPlayerState.ON
-                if power > self._power_threshold
+                if power > POWER_THRESHOLD
                 else MediaPlayerState.OFF
             )
         except (ValueError, TypeError):
             pass
 
-    async def _send_command(self, command: str) -> None:
-        """Send an IR command via the Broadlink remote."""
+    @property
+    def _is_on(self) -> bool:
+        """Check if amplifier is currently on based on power sensor."""
+        if self._power_sensor:
+            return self._attr_state == MediaPlayerState.ON
+        return self._attr_state == MediaPlayerState.ON
+
+    async def _send_ir(self, command: str) -> None:
+        """Send an IR command via the configured remote."""
+        code = IR_CODES.get(command)
+        if code is None:
+            _LOGGER.error("Unknown IR command: %s", command)
+            return
         await self.hass.services.async_call(
             "remote",
             "send_command",
             {
                 "entity_id": self._remote_entity,
-                "device": self._remote_device,
-                "command": command,
+                "command": f"b64:{code}",
             },
         )
 
     async def async_turn_on(self) -> None:
-        """Turn the amplifier on."""
-        await self._send_command(CMD_ON)
+        """Turn the amplifier on. Skip if already on (prevents redundant IR)."""
+        if self._is_on:
+            return
+        await self._send_ir("on")
         if not self._power_sensor:
             self._attr_state = MediaPlayerState.ON
             self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
-        """Turn the amplifier off."""
-        await self._send_command(CMD_OFF)
+        """Turn the amplifier off. Skip if already off (prevents redundant IR)."""
+        if not self._is_on:
+            return
+        await self._send_ir("off")
         self._attr_is_volume_muted = False
         if not self._power_sensor:
             self._attr_state = MediaPlayerState.OFF
@@ -139,15 +154,15 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
 
     async def async_volume_up(self) -> None:
         """Volume up."""
-        await self._send_command(CMD_VOLUME_UP)
+        await self._send_ir("volumeUp")
 
     async def async_volume_down(self) -> None:
         """Volume down."""
-        await self._send_command(CMD_VOLUME_DOWN)
+        await self._send_ir("volumeDown")
 
     async def async_mute_volume(self, mute: bool) -> None:
-        """Toggle mute (IR is a toggle, mute param ignored)."""
-        await self._send_command(CMD_MUTE)
+        """Toggle mute."""
+        await self._send_ir("mute")
         self._attr_is_volume_muted = not self._attr_is_volume_muted
         self.async_write_ha_state()
 
@@ -157,6 +172,6 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
         if command is None:
             _LOGGER.error("Unknown source: %s", source)
             return
-        await self._send_command(command)
+        await self._send_ir(command)
         self._attr_source = source
         self.async_write_ha_state()

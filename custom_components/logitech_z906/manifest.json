@@ -2,6 +2,7 @@
   "domain": "logitech_z906",
   "name": "Logitech Z906",
   "codeowners": ["@azgooon"],
+  "config_flow": true,
   "dependencies": ["remote"],
   "documentation": "https://github.com/azgooon/logitech-z906",
   "iot_class": "assumed_state",

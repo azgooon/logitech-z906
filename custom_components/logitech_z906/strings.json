@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Logitech Z906 Setup",
+        "description": "Set up your Z906 speaker system. You need an IR blaster (e.g. Broadlink) already configured in Home Assistant.",
+        "data": {
+          "remote_entity": "IR remote entity",
+          "power_sensor": "Power sensor (optional)"
+        }
+      }
+    }
+  }
+}

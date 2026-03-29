@@ -1,50 +1,25 @@
 """Logitech Z906 integration — IR-controlled media player via Broadlink."""
 
-import voluptuous as vol
-
-from homeassistant.const import CONF_NAME, Platform
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, discovery
-from homeassistant.helpers.typing import ConfigType
 
-from .const import (
-    CONF_POWER_SENSOR,
-    CONF_POWER_THRESHOLD,
-    CONF_REMOTE_DEVICE,
-    CONF_REMOTE_ENTITY,
-    DEFAULT_POWER_THRESHOLD,
-    DOMAIN,
-)
-
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_REMOTE_ENTITY): cv.entity_id,
-                vol.Required(CONF_REMOTE_DEVICE): cv.string,
-                vol.Optional(CONF_POWER_SENSOR): cv.entity_id,
-                vol.Optional(
-                    CONF_POWER_THRESHOLD, default=DEFAULT_POWER_THRESHOLD
-                ): vol.Coerce(float),
-                vol.Optional(CONF_NAME, default="Logitech Z906"): cv.string,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+from .const import DOMAIN
 
 PLATFORMS = [Platform.MEDIA_PLAYER]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Logitech Z906 integration from YAML."""
-    if DOMAIN not in config:
-        return True
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = dict(entry.data)
 
-    hass.data[DOMAIN] = config[DOMAIN]
-
-    await discovery.async_load_platform(
-        hass, Platform.MEDIA_PLAYER, DOMAIN, {}, config
-    )
-
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload a config entry."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+    return unload_ok
