@@ -4,7 +4,7 @@ import voluptuous as vol
 
 from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, discovery
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -43,8 +43,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.data[DOMAIN] = config[DOMAIN]
 
-    await hass.helpers.discovery.async_load_platform(
-        Platform.MEDIA_PLAYER, DOMAIN, {}, config
+    await discovery.async_load_platform(
+        hass, Platform.MEDIA_PLAYER, DOMAIN, {}, config
     )
 
     return True
