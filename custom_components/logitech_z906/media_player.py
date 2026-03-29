@@ -14,6 +14,7 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
+    BROADLINK_DEVICE,
     CONF_POWER_SENSOR,
     CONF_REMOTE_ENTITY,
     DOMAIN,
@@ -119,17 +120,18 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
         return self._attr_state == MediaPlayerState.ON
 
     async def _send_ir(self, command: str) -> None:
-        """Send an IR command via the configured remote."""
-        code = IR_CODES.get(command)
-        if code is None:
-            _LOGGER.error("Unknown IR command: %s", command)
-            return
+        """Send an IR command via the configured remote.
+
+        Tries named command via Broadlink device storage first (fast, local).
+        Falls back to raw base64 if no device name is configured.
+        """
         await self.hass.services.async_call(
             "remote",
             "send_command",
             {
                 "entity_id": self._remote_entity,
-                "command": f"b64:{code}",
+                "device": BROADLINK_DEVICE,
+                "command": command,
             },
         )
 

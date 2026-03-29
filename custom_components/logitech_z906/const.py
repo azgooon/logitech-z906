@@ -5,6 +5,9 @@ DOMAIN = "logitech_z906"
 CONF_REMOTE_ENTITY = "remote_entity"
 CONF_POWER_SENSOR = "power_sensor"
 
+# Device name used in Broadlink storage for IR codes
+BROADLINK_DEVICE = "Logitech Z906"
+
 # Power threshold in watts — above this = amplifier is on
 POWER_THRESHOLD = 2
 
