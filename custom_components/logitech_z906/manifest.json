@@ -1,0 +1,11 @@
+{
+  "domain": "logitech_z906",
+  "name": "Logitech Z906",
+  "codeowners": ["@azgooon"],
+  "dependencies": ["remote"],
+  "documentation": "https://github.com/azgooon/logitech-z906",
+  "iot_class": "assumed_state",
+  "issue_tracker": "https://github.com/azgooon/logitech-z906/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
