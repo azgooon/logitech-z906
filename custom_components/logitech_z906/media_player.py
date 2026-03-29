@@ -120,18 +120,17 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
         return self._attr_state == MediaPlayerState.ON
 
     async def _send_ir(self, command: str) -> None:
-        """Send an IR command via the configured remote.
-
-        Tries named command via Broadlink device storage first (fast, local).
-        Falls back to raw base64 if no device name is configured.
-        """
+        """Send an IR command via the configured remote using embedded base64 codes."""
+        code = IR_CODES.get(command)
+        if code is None:
+            _LOGGER.error("Unknown IR command: %s", command)
+            return
         await self.hass.services.async_call(
             "remote",
             "send_command",
             {
                 "entity_id": self._remote_entity,
-                "device": BROADLINK_DEVICE,
-                "command": command,
+                "command": "b64:" + code,
             },
         )
 
@@ -169,7 +168,7 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
         self.async_write_ha_state()
 
     async def async_select_source(self, source: str) -> None:
-        """Select input source."""
+        """Select input source using discrete IR codes."""
         command = SOURCES.get(source)
         if command is None:
             _LOGGER.error("Unknown source: %s", source)
