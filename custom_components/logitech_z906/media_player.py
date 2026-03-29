@@ -125,11 +125,17 @@ class LogitechZ906(RestoreEntity, MediaPlayerEntity):
     async def async_turn_on(self) -> None:
         """Turn the amplifier on."""
         await self._send_command(CMD_ON)
+        if not self._power_sensor:
+            self._attr_state = MediaPlayerState.ON
+            self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn the amplifier off."""
         await self._send_command(CMD_OFF)
         self._attr_is_volume_muted = False
+        if not self._power_sensor:
+            self._attr_state = MediaPlayerState.OFF
+            self.async_write_ha_state()
 
     async def async_volume_up(self) -> None:
         """Volume up."""
